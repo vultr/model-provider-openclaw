@@ -1,0 +1,58 @@
+{
+  "name": "@vultr/model-provider-openclaw",
+  "version": "0.0.1",
+  "description": "Vultr Inference for OpenClaw: the live /v1/models catalog as a model provider",
+  "author": "Matt Harris <mharris@vultr.com>",
+  "maintainers": ["Matt Harris <mharris@vultr.com>"],
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "vultr",
+    "model-provider"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vultr/model-provider-openclaw.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "providers": [
+      "vultr"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.9.4",
+      "minGatewayVersion": "2026.9.4"
+    },
+    "build": {
+      "openclawVersion": "2026.9.4",
+      "pluginSdkVersion": "2026.9.4"
+    }
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --format=esm --target=node20 --external:openclaw --external:\"openclaw/*\" --outfile=dist/index.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.9.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vultr/model-catalog": "git+https://github.com/vultr/model-catalog-typescript.git#v0.0.1",
+    "esbuild": "^0.25.0",
+    "openclaw": "2026.9.4",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "vultr",
+  "name": "Vultr",
+  "description": "Vultr Inference model provider with a live model catalog",
+  "providers": ["vultr"],
+  "setup": {
+    "providers": [
+      {
+        "id": "vultr",
+        "envVars": ["VULTR_INFERENCE_API_KEY"]
+      }
+    ]
+  },
+  "providerAuthChoices": [
+    {
+      "provider": "vultr",
+      "method": "api-key",
+      "choiceId": "vultr-api-key",
+      "choiceLabel": "Vultr Inference API key",
+      "groupId": "vultr",
+      "groupLabel": "Vultr",
+      "cliFlag": "--vultr-api-key",
+      "cliOption": "--vultr-api-key <key>",
+      "cliDescription": "Vultr Inference API key"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}
