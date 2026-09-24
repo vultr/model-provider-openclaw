@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@vultr/model-catalog": "git+https://github.com/vultr/model-catalog-typescript.git#v0.0.1",
+    "@vultr/model-catalog": "0.0.1",
     "esbuild": "^0.25.0",
     "openclaw": "2026.9.4",
     "typescript": "^5.9.0"
