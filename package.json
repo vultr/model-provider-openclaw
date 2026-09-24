@@ -1,6 +1,6 @@
 {
   "name": "@vultr/model-provider-openclaw",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Vultr Inference for OpenClaw: the live /v1/models catalog as a model provider",
   "author": "Matt Harris <mharris@vultr.com>",
   "maintainers": ["Matt Harris <mharris@vultr.com>"],
