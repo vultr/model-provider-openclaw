@@ -5,14 +5,20 @@ Vultr Inference as a model provider plugin for [OpenClaw](https://openclaw.ai). 
 ## Install
 
 ```bash
-openclaw plugins install git:github.com/vultr/model-provider-openclaw --force --accept-capabilities
+openclaw plugins install clawhub:@vultr/model-provider-openclaw --accept-capabilities
 export VULTR_INFERENCE_API_KEY=... # or: openclaw onboard --vultr-api-key <key>
 openclaw models list --all --provider vultr --refresh
 openclaw infer model run --local --model vultr/glm-5.3 --thinking high --prompt "hello"
 ```
 
-`--force` is required for any source outside ClawHub. A local checkout
-installs the same way; OpenClaw copies it:
+To install from the Git repository instead:
+
+```bash
+openclaw plugins install git:github.com/vultr/model-provider-openclaw --force --accept-capabilities
+```
+
+`--force` is required for sources outside ClawHub. A local checkout installs
+the same way; OpenClaw copies it:
 
 ```bash
 openclaw plugins install ~/src/vultr/model-provider-openclaw --force --accept-capabilities
