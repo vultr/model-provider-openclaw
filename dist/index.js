@@ -75,6 +75,9 @@ function normalizeModel(document) {
 function isChatModel(model) {
   return model.outputModalities.includes("text");
 }
+function isAgentModel(model) {
+  return isChatModel(model) && model.isReady && model.tools && model.contextWindow !== null;
+}
 function acceptsInput(model, modality) {
   return model.inputModalities.includes(modality);
 }
@@ -234,7 +237,7 @@ function outputBudget(model) {
   return Math.min(model.maxOutputTokens ?? contextWindow, MAX_OUTPUT_TOKENS, Math.floor(contextWindow / 4));
 }
 function isUsable(model) {
-  return isChatModel(model) && model.isReady && model.contextWindow !== null;
+  return isAgentModel(model);
 }
 function toOpenClawModel(model) {
   const price2 = pricePerMillion(model);

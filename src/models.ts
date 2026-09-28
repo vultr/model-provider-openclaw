@@ -1,5 +1,5 @@
 import type { ProviderCatalogResult } from "openclaw/plugin-sdk/plugin-entry";
-import { acceptsInput, isChatModel, pricePerMillion, type CatalogModel } from "@vultr/model-catalog";
+import { acceptsInput, isAgentModel, pricePerMillion, type CatalogModel } from "@vultr/model-catalog";
 
 type ProviderEntry = Extract<NonNullable<ProviderCatalogResult>, { provider: unknown }>["provider"];
 export type OpenClawModel = NonNullable<ProviderEntry["models"]>[number];
@@ -36,7 +36,7 @@ export function outputBudget(model: CatalogModel): number {
 }
 
 export function isUsable(model: CatalogModel): boolean {
-  return isChatModel(model) && model.isReady && model.contextWindow !== null;
+  return isAgentModel(model);
 }
 
 export function toOpenClawModel(model: CatalogModel): OpenClawModel {

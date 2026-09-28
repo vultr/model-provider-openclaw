@@ -93,12 +93,13 @@ test("a model that cannot reason, see images or report limits still maps", () =>
   });
 });
 
-test("only ready chat models with a context window are offered", () => {
+test("only ready chat models with tools and a context window are offered", () => {
   const reranker = document({ id: "rerank", output_modalities: [{ type: "rerank", supported_parameters: {} }] });
   const unready = document({ id: "unready", is_ready: false });
   const blind = document({ id: "no-context", input_modalities: [{ type: "text" }] });
-  const models = [document(), reranker, unready, blind].map(normalizeModel);
-  assert.deepEqual(models.map(isUsable), [true, false, false, false]);
+  const toolless = document({ id: "no-tools", output_modalities: [{ type: "text", supported_parameters: {} }] });
+  const models = [document(), reranker, unready, blind, toolless].map(normalizeModel);
+  assert.deepEqual(models.map(isUsable), [true, false, false, false, false]);
   assert.deepEqual(
     toOpenClawModels(models).map((model) => model.id),
     ["glm-5.3"],
