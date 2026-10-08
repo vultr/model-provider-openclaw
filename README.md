@@ -1,6 +1,6 @@
 # @vultr/model-provider-openclaw
 
-Vultr Inference as a model provider plugin for [OpenClaw](https://openclaw.ai). The model list, context windows, prices, input types and reasoning levels come from the live `GET /v1/models` catalog.
+Vultr Inference as a model, speech and transcription provider plugin for [OpenClaw](https://openclaw.ai). The model list, context windows, prices, input types and reasoning levels come from the live `GET /v1/models` catalog, and so do the text-to-speech and speech-to-text models.
 
 ## Install
 
@@ -49,6 +49,9 @@ TypeScript entry outside a linked checkout, and it installs dependencies with
   fails with `Unknown model`. `prepare` loads the catalog; `resolve` is
   synchronous and answers from what `prepare` loaded
 
+It also registers speech provider `vultr` and an audio media-understanding
+provider `vultr`; see [Speech and transcription](#speech-and-transcription).
+
 The last good catalog is kept in `<agent dir>/cache/vultr-model-catalog.json`
 and served when the network fails. With neither, the hooks return nothing and
 OpenClaw carries on without the provider.
@@ -68,6 +71,37 @@ The output budget exists because OpenClaw sends `maxTokens` as `max_tokens`
 without clamping it to the context that is left, and Vultr publishes
 `max_length` equal to the context window for most models. Unchanged, every
 request would ask for more than the engine can give and be rejected.
+
+## Speech and transcription
+
+| OpenClaw | Vultr |
+| --- | --- |
+| Speech provider `vultr` | `POST /v1/audio/speech`. Models are the catalog's ready models with `speech` output |
+| Its voices (`infer tts voices`) | `GET /v1/audio/voices?model=`, live |
+| Media understanding, audio | `POST /v1/audio/transcriptions` (multipart). Models are the catalog's ready models with `transcription` output |
+
+Without a configured model, each uses the catalog's first model of its kind.
+Speech asks for mp3, or Opus for a voice note, unless `responseFormat` is set
+(`mp3`, `opus`, `flac`, `wav`, `pcm`). The key comes from the provider block's
+`apiKey`, then the stored Vultr credential, then `VULTR_INFERENCE_API_KEY`.
+
+```bash
+openclaw config set tts.provider vultr
+openclaw config set tts.providers.vultr '{"model":"qwen3-tts-12hz-1.7b","speakerVoice":"aiden"}' --strict-json
+openclaw config set tools.media.models '[{"provider":"vultr","model":"whisper-large-v3-turbo","capabilities":["audio"]}]' --strict-json
+openclaw infer tts voices --provider vultr
+openclaw infer tts convert --text "hello" --output ./hello.mp3
+openclaw infer audio transcribe --file ./hello.mp3
+```
+
+`tts.providers.vultr` also takes `instructions`, `language` and `speed`,
+passed to the speech route as is.
+
+OpenClaw reads a speech provider's model list once, at registration. The
+plugin refills that list in place whenever it loads the catalog, so a new
+model appears without a restart once the gateway has listed models. Set the
+model on `tts.providers.vultr` rather than in `agents.defaults.voiceModel`:
+OpenClaw silently drops a `voiceModel` ref that is not in the list yet.
 
 ## Environment
 

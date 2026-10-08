@@ -1,8 +1,15 @@
 {
   "id": "vultr",
   "name": "Vultr",
-  "description": "Vultr Inference model provider with a live model catalog",
+  "description": "Vultr Inference models, speech and transcription from the live model catalog",
   "providers": ["vultr"],
+  "contracts": {
+    "speechProviders": ["vultr"],
+    "mediaUnderstandingProviders": ["vultr"]
+  },
+  "mediaUnderstandingProviderMetadata": {
+    "vultr": { "capabilities": ["audio"] }
+  },
   "setup": {
     "providers": [
       {

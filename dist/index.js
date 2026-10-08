@@ -1,7 +1,11 @@
 // index.ts
 import { join } from "node:path";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-auth";
+import {
+  createProviderApiKeyAuthMethod,
+  isProviderApiKeyConfigured,
+  resolveProviderAuthProfileApiKey
+} from "openclaw/plugin-sdk/provider-auth";
 
 // node_modules/@vultr/model-catalog/dist/catalog.js
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -147,8 +151,8 @@ function modelsUrl(baseUrl = DEFAULT_BASE_URL) {
 }
 async function fetchCatalog(options = {}) {
   const url = modelsUrl(options.baseUrl);
-  const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const timeout2 = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout2]) : timeout2;
   const headers = { accept: "application/json", ...options.headers };
   if (options.apiKey) {
     headers["authorization"] = `Bearer ${options.apiKey}`;
@@ -215,6 +219,103 @@ async function loadCatalog(options = {}) {
   }
 }
 
+// src/audio.ts
+var RESPONSE_FORMATS = ["mp3", "opus", "flac", "wav", "pcm"];
+function producing(models2, modality) {
+  return models2.filter((model) => model.isReady && model.outputModalities.includes(modality)).map((model) => model.id);
+}
+var speechModels = (models2) => producing(models2, "speech");
+var transcriptionModels = (models2) => producing(models2, "transcription");
+var text = (value) => typeof value === "string" && value.trim() ? value.trim() : void 0;
+var number = (value) => typeof value === "number" && Number.isFinite(value) ? value : void 0;
+var record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+function format(value) {
+  const name = text(value)?.toLowerCase();
+  if (name === void 0) {
+    return void 0;
+  }
+  if (!RESPONSE_FORMATS.includes(name)) {
+    throw new Error(`Vultr speech responseFormat must be one of ${RESPONSE_FORMATS.join(", ")}, not ${name}`);
+  }
+  return name;
+}
+function readSpeechSettings(raw) {
+  const block = record(raw) ?? {};
+  const settings = {};
+  const assign = (key, value) => {
+    if (value !== void 0) {
+      settings[key] = value;
+    }
+  };
+  assign("apiKey", text(block.apiKey));
+  assign("baseUrl", text(block.baseUrl));
+  assign("model", text(block.model ?? block.modelId));
+  assign("voice", text(block.speakerVoice ?? block.speakerVoiceId ?? block.voice ?? block.voiceId));
+  assign("instructions", text(block.instructions));
+  assign("language", text(block.language));
+  assign("speed", number(block.speed));
+  assign("responseFormat", format(block.responseFormat));
+  return settings;
+}
+function speechSettingsFrom(rawConfig) {
+  const config = record(rawConfig);
+  return readSpeechSettings(record(config?.providers)?.vultr ?? config?.vultr);
+}
+function responseFormat(target, configured) {
+  return configured ?? (target === "voice-note" ? "opus" : "mp3");
+}
+function speechBody({ text: input, model, settings, overrides, format: responseFormat2 }) {
+  const voice = text(overrides?.voice ?? overrides?.voiceId) ?? settings.voice;
+  const speed = number(overrides?.speed) ?? settings.speed;
+  return {
+    model,
+    input,
+    response_format: responseFormat2,
+    ...voice ? { voice } : {},
+    ...speed !== void 0 ? { speed } : {},
+    ...settings.instructions ? { instructions: settings.instructions } : {},
+    ...settings.language ? { language: settings.language } : {}
+  };
+}
+function toVoiceOptions(payload) {
+  const data = record(payload)?.data;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data.flatMap((entry) => {
+    const voice = record(entry);
+    const id = text(voice?.id);
+    if (!voice || !id) {
+      return [];
+    }
+    const language = text(voice.native_language);
+    const description = [text(voice.description), language && `(${language})`].filter(Boolean).join(" ");
+    const name = text(voice.name);
+    const mode = text(voice.mode);
+    return [{ id, ...name ? { name } : {}, ...description ? { description } : {}, ...mode ? { category: mode } : {} }];
+  });
+}
+function uploadName(fileName, mime) {
+  if (/\.[a-z0-9]{2,5}$/i.test(fileName)) {
+    return fileName;
+  }
+  const extension = {
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/flac": "flac",
+    "audio/ogg": "ogg",
+    "audio/opus": "ogg",
+    "audio/webm": "webm",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "m4a"
+  };
+  const type = mime?.split(";")[0]?.trim().toLowerCase();
+  return `${fileName || "audio"}.${(type && extension[type]) ?? "mp3"}`;
+}
+
 // src/models.ts
 var LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"];
 var INPUTS = ["text", "image", "video", "audio"];
@@ -277,18 +378,57 @@ var PROVIDER = "vultr";
 var API_KEY_ENV = "VULTR_INFERENCE_API_KEY";
 var BASE_URL_ENV = "VULTR_INFERENCE_BASE_URL";
 var baseUrlFrom = (env) => env[BASE_URL_ENV] || DEFAULT_BASE_URL;
-async function models(baseUrl, agentDir) {
+var speechModelIds = [];
+var transcriptionModelIds = [];
+var lastModels;
+async function catalogModels(baseUrl, agentDir) {
   const catalog = await loadCatalog({
     baseUrl,
     timeoutMs: 5e3,
     ...agentDir ? { cachePath: join(agentDir, "cache", "vultr-model-catalog.json") } : {}
   });
-  return toOpenClawModels(catalog.models);
+  lastModels = catalog.models;
+  speechModelIds.splice(0, speechModelIds.length, ...speechModels(catalog.models));
+  transcriptionModelIds.splice(0, transcriptionModelIds.length, ...transcriptionModels(catalog.models));
+  return catalog.models;
 }
+async function models(baseUrl, agentDir) {
+  return toOpenClawModels(await catalogModels(baseUrl, agentDir));
+}
+async function firstModel(baseUrl, pick, kind) {
+  const model = pick(lastModels ?? await catalogModels(baseUrl, void 0))[0];
+  if (!model) {
+    throw new Error(`The Vultr catalog has no ${kind} model`);
+  }
+  return model;
+}
+async function speechApiKey(cfg, settings) {
+  if (settings.apiKey) {
+    return settings.apiKey;
+  }
+  try {
+    const stored = await resolveProviderAuthProfileApiKey({ provider: PROVIDER, ...cfg ? { cfg } : {} });
+    if (stored) {
+      return stored;
+    }
+  } catch {
+  }
+  return process.env[API_KEY_ENV] || void 0;
+}
+async function failure(response, label) {
+  const body = await response.text().catch(() => "");
+  let message = body.slice(0, 500);
+  try {
+    message = JSON.parse(body).error?.message ?? message;
+  } catch {
+  }
+  return new Error(`${label} failed (${response.status}): ${message}`);
+}
+var timeout = (timeoutMs, signal) => signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
 var index_default = definePluginEntry({
   id: PROVIDER,
   name: "Vultr",
-  description: "Vultr Inference model provider with a live model catalog",
+  description: "Vultr Inference models, speech and transcription from the live model catalog",
   register(api) {
     const resolved = /* @__PURE__ */ new Map();
     api.registerProvider({
@@ -339,8 +479,16 @@ var index_default = definePluginEntry({
         if (!model) {
           return void 0;
         }
+        const { id, name, reasoning, thinkingLevelMap: thinkingLevelMap2, cost, maxTokens, compat } = model;
         return {
-          ...model,
+          id,
+          name,
+          reasoning,
+          // thinkingLevelMap() sets every level it lists to a string or null, never undefined.
+          ...thinkingLevelMap2 ? { thinkingLevelMap: thinkingLevelMap2 } : {},
+          cost,
+          maxTokens,
+          ...compat ? { compat } : {},
           // The runtime model takes text and image only; video and audio stay catalog metadata.
           input: model.input.filter((modality) => modality === "text" || modality === "image"),
           contextWindow: model.contextWindow ?? 0,
@@ -348,6 +496,101 @@ var index_default = definePluginEntry({
           api: "openai-completions",
           baseUrl: baseUrlFrom(process.env)
         };
+      }
+    });
+    api.registerSpeechProvider({
+      id: PROVIDER,
+      label: "Vultr",
+      models: speechModelIds,
+      resolveConfig: ({ rawConfig }) => ({ ...speechSettingsFrom(rawConfig) }),
+      isConfigured: ({ cfg, providerConfig }) => {
+        if (readSpeechSettings(providerConfig).apiKey || process.env[API_KEY_ENV]) {
+          return true;
+        }
+        try {
+          return isProviderApiKeyConfigured({ provider: PROVIDER, ...cfg ? { cfg } : {} });
+        } catch {
+          return false;
+        }
+      },
+      synthesize: async (req) => {
+        const settings = readSpeechSettings(req.providerConfig);
+        const apiKey = await speechApiKey(req.cfg, settings);
+        if (!apiKey) {
+          throw new Error("Vultr Inference API key missing");
+        }
+        const baseUrl = settings.baseUrl ?? baseUrlFrom(process.env);
+        const override = req.providerOverrides?.model ?? req.providerOverrides?.modelId;
+        const model = typeof override === "string" && override.trim() || settings.model || await firstModel(baseUrl, speechModels, "speech");
+        const format2 = responseFormat(req.target, settings.responseFormat);
+        const response = await fetch(`${baseUrl}/audio/speech`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(speechBody({ text: req.text, model, settings, overrides: req.providerOverrides, format: format2 })),
+          signal: timeout(req.timeoutMs)
+        });
+        if (!response.ok) {
+          throw await failure(response, "Vultr speech");
+        }
+        return {
+          audioBuffer: Buffer.from(await response.arrayBuffer()),
+          outputFormat: format2,
+          fileExtension: `.${format2}`,
+          voiceCompatible: req.target === "voice-note" && format2 === "opus"
+        };
+      },
+      // The voices of the configured model, or of the catalog's first speech model.
+      listVoices: async (req) => {
+        const settings = readSpeechSettings(req.providerConfig);
+        const apiKey = req.apiKey || await speechApiKey(req.cfg, settings);
+        if (!apiKey) {
+          throw new Error("Vultr Inference API key missing");
+        }
+        const baseUrl = req.baseUrl || settings.baseUrl || baseUrlFrom(process.env);
+        const model = settings.model ?? await firstModel(baseUrl, speechModels, "speech");
+        const response = await fetch(`${baseUrl}/audio/voices?model=${encodeURIComponent(model)}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: timeout(req.timeoutMs ?? 1e4)
+        });
+        if (!response.ok) {
+          throw await failure(response, "Vultr voices");
+        }
+        return toVoiceOptions(await response.json());
+      }
+    });
+    api.registerMediaUnderstandingProvider({
+      id: PROVIDER,
+      capabilities: ["audio"],
+      transcribeAudio: async (req) => {
+        const baseUrl = req.baseUrl || baseUrlFrom(process.env);
+        const model = req.model || await firstModel(baseUrl, transcriptionModels, "transcription");
+        const form = new FormData();
+        form.append(
+          "file",
+          new Blob([new Uint8Array(req.buffer)], { type: req.mime ?? "application/octet-stream" }),
+          uploadName(req.fileName, req.mime)
+        );
+        form.append("model", model);
+        if (req.language) {
+          form.append("language", req.language);
+        }
+        if (req.prompt) {
+          form.append("prompt", req.prompt);
+        }
+        const response = await (req.fetchFn ?? fetch)(`${baseUrl}/audio/transcriptions`, {
+          method: "POST",
+          headers: { ...req.headers, Authorization: `Bearer ${req.apiKey}` },
+          body: form,
+          signal: timeout(req.timeoutMs, req.signal)
+        });
+        if (!response.ok) {
+          throw await failure(response, "Vultr transcription");
+        }
+        const payload = await response.json();
+        if (typeof payload.text !== "string") {
+          throw new Error("Vultr transcription answered without text");
+        }
+        return { text: payload.text, model };
       }
     });
   }

@@ -1,7 +1,7 @@
 {
   "name": "@vultr/model-provider-openclaw",
   "version": "0.0.4",
-  "description": "Vultr Inference for OpenClaw: the live /v1/models catalog as a model provider",
+  "description": "Vultr Inference for OpenClaw: models, speech and transcription from the live /v1/models catalog",
   "author": "Matt Harris <mharris@vultr.com>",
   "maintainers": ["Matt Harris <mharris@vultr.com>"],
   "license": "MIT",
@@ -10,7 +10,9 @@
     "openclaw",
     "openclaw-plugin",
     "vultr",
-    "model-provider"
+    "model-provider",
+    "tts",
+    "stt"
   ],
   "repository": {
     "type": "git",
@@ -27,12 +29,12 @@
       "vultr"
     ],
     "compat": {
-      "pluginApi": ">=2026.9.4",
-      "minGatewayVersion": "2026.9.4"
+      "pluginApi": ">=2026.9.7",
+      "minGatewayVersion": "2026.9.7"
     },
     "build": {
-      "openclawVersion": "2026.9.4",
-      "pluginSdkVersion": "2026.9.4"
+      "openclawVersion": "2026.9.7",
+      "pluginSdkVersion": "2026.9.7"
     }
   },
   "files": [
@@ -46,13 +48,13 @@
     "test": "node --test \"test/**/*.test.ts\""
   },
   "peerDependencies": {
-    "openclaw": ">=2026.9.4"
+    "openclaw": ">=2026.9.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@vultr/model-catalog": "0.0.2",
     "esbuild": "^0.25.0",
-    "openclaw": "2026.9.4",
+    "openclaw": "2026.9.7",
     "typescript": "^5.9.0"
   }
 }

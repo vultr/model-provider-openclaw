@@ -1,6 +1,6 @@
 # AGENTS.md - vultr/model-provider-openclaw
 
-A native OpenClaw plugin: one provider, `vultr`, fed by the live catalog. `index.ts` is the entry source and holds the hooks; `dist/index.js` is its committed bundle and is what OpenClaw loads; `src/models.ts` is the mapping and is what the tests cover; `openclaw.plugin.json` is the manifest OpenClaw reads before it loads any code.
+A native OpenClaw plugin: one provider id, `vultr`, fed by the live catalog, registered for models, speech and audio transcription. `index.ts` is the entry source and holds the hooks; `dist/index.js` is its committed bundle and is what OpenClaw loads; `src/models.ts` (models) and `src/audio.ts` (speech and transcription) are the mapping and are what the tests cover; `openclaw.plugin.json` is the manifest OpenClaw reads before it loads any code.
 
 Human overview, mapping table and install: `README.md`.
 
@@ -24,6 +24,12 @@ Human overview, mapping table and install: `README.md`.
 - **Reasoning travels as top-level `reasoning_effort`,** limited to the
   model's `supported_efforts`; `none` switches it off unless reasoning is
   mandatory.
+- **Speech and transcription models are picked by output modality:** `speech`
+  and `transcription`. OpenClaw holds the speech `models` array from
+  registration, so it is refilled in place, never replaced
+- **Audio requests are plugin-owned `fetch` calls.** OpenClaw's speech and
+  provider-http SDK helpers are private-local; only `plugin-entry` types and
+  `provider-auth` are used
 - **Siblings:** `model-provider-pi` maps onto almost the same model type (OpenClaw is built on pi). A mapping fix here usually applies there too
 
 ## Working here
