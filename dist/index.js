@@ -31,11 +31,42 @@ function price(entries, type, unit) {
   const matches = (entries ?? []).filter((entry) => entry.type === type && entry.unit === unit && typeof entry.cost_usd === "string");
   return (matches.find((entry) => !isWindowed(entry)) ?? matches[0])?.cost_usd ?? null;
 }
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function effortValues(descriptor) {
+  if (!isRecord(descriptor))
+    return void 0;
+  if (descriptor["type"] === "unknown")
+    return null;
+  if (descriptor["type"] === "enum" && Array.isArray(descriptor["values"])) {
+    return descriptor["values"].filter((value) => typeof value === "string");
+  }
+  return void 0;
+}
+function reasoningSupport(parameters, root) {
+  const effort = parameters["reasoning_effort"];
+  const object = parameters["reasoning"];
+  if (!isRecord(effort) && !isRecord(object) && !isRecord(root))
+    return null;
+  const properties = isRecord(object) && isRecord(object["properties"]) ? object["properties"] : void 0;
+  let efforts = effortValues(effort);
+  if (efforts === void 0)
+    efforts = effortValues(properties?.["effort"]);
+  const maxTokens = properties === void 0 ? void 0 : "max_tokens" in properties;
+  const fallback = isRecord(root) ? root : void 0;
+  return {
+    mandatory: fallback?.mandatory === true,
+    defaultEffort: fallback?.default_effort ?? null,
+    defaultEnabled: fallback?.default_enabled ?? null,
+    supportedEfforts: efforts !== void 0 ? efforts : fallback?.supported_efforts ?? null,
+    supportsMaxTokens: maxTokens ?? fallback?.supports_max_tokens === true
+  };
+}
 function normalizeModel(document) {
   const textIn = document.input_modalities.find((modality) => modality.type === "text");
   const textOut = document.output_modalities.find((modality) => modality.type === "text");
   const parameters = textOut?.supported_parameters ?? {};
-  const reasoning = document.reasoning ?? null;
   return {
     id: document.id,
     name: document.name || document.id,
@@ -61,13 +92,7 @@ function normalizeModel(document) {
     streaming: textOut?.streaming === true,
     supportedParameters: Object.keys(parameters),
     parameters,
-    reasoning: reasoning && {
-      mandatory: reasoning.mandatory === true,
-      defaultEffort: reasoning.default_effort ?? null,
-      defaultEnabled: reasoning.default_enabled ?? null,
-      supportedEfforts: reasoning.supported_efforts ?? null,
-      supportsMaxTokens: reasoning.supports_max_tokens === true
-    },
+    reasoning: reasoningSupport(parameters, document.reasoning),
     isReady: document.is_ready !== false,
     deprecationDate: document.deprecation_date ?? null
   };
@@ -97,21 +122,21 @@ function pricePerMillion(model) {
 var SCHEMA_VERSION = "2.4";
 
 // node_modules/@vultr/model-catalog/dist/parse.js
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isModalityList(value) {
-  return Array.isArray(value) && value.every((item) => isRecord(item) && typeof item["type"] === "string");
+  return Array.isArray(value) && value.every((item) => isRecord2(item) && typeof item["type"] === "string");
 }
 function parseCatalog(payload) {
-  const entries = Array.isArray(payload) ? payload : isRecord(payload) ? payload["data"] : void 0;
+  const entries = Array.isArray(payload) ? payload : isRecord2(payload) ? payload["data"] : void 0;
   if (!Array.isArray(entries)) {
     throw new TypeError("catalog payload must be an array or an object with a data array");
   }
   const documents = [];
   const issues = [];
   entries.forEach((entry, index) => {
-    if (!isRecord(entry)) {
+    if (!isRecord2(entry)) {
       issues.push({ index, id: null, message: "entry is not an object" });
       return;
     }
