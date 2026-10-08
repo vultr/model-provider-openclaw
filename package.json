@@ -1,9 +1,11 @@
 {
   "name": "@vultr/model-provider-openclaw",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Vultr Inference for OpenClaw: the live /v1/models catalog as a model provider",
   "author": "Matt Harris <mharris@vultr.com>",
-  "maintainers": ["Matt Harris <mharris@vultr.com>"],
+  "maintainers": [
+    "Matt Harris <mharris@vultr.com>"
+  ],
   "license": "MIT",
   "type": "module",
   "keywords": [
