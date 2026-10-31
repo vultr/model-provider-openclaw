@@ -337,7 +337,7 @@ function toOpenClawModels(models2) {
 }
 
 // src/version.ts
-var VERSION2 = "0.0.5";
+var VERSION2 = "0.0.6";
 
 // index.ts
 var PROVIDER = "vultr";
