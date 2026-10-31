@@ -54,7 +54,7 @@
     "@types/node": "^24.0.0",
     "@vultr/model-catalog": "0.0.4",
     "esbuild": "^0.25.0",
-    "openclaw": "2026.9.4",
+    "openclaw": "2026.10.9",
     "typescript": "^5.9.0"
   }
 }
