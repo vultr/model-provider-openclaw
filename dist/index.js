@@ -27,8 +27,8 @@ function limit(value) {
 function isWindowed(entry) {
   return entry.utc_start !== void 0 || entry.utc_end !== void 0 || entry.utc_days !== void 0;
 }
-function price(entries, type, unit) {
-  const matches = (entries ?? []).filter((entry) => entry.type === type && entry.unit === unit && typeof entry.cost_usd === "string");
+function price(entries2, type, unit) {
+  const matches = (entries2 ?? []).filter((entry) => entry.type === type && entry.unit === unit && typeof entry.cost_usd === "string");
   return (matches.find((entry) => !isWindowed(entry)) ?? matches[0])?.cost_usd ?? null;
 }
 function isRecord(value) {
@@ -63,6 +63,29 @@ function reasoningSupport(parameters, root) {
     supportsMaxTokens: maxTokens ?? fallback?.supports_max_tokens === true
   };
 }
+function records(value) {
+  return isRecord(value) ? value : {};
+}
+function entries(value) {
+  return Array.isArray(value) ? value.filter((entry) => isRecord(entry)) : [];
+}
+function outputSpec(modality) {
+  return {
+    type: modality.type,
+    streaming: typeof modality.streaming === "boolean" ? modality.streaming : null,
+    maxLength: limit(modality.max_length) === null ? null : modality.max_length,
+    parameters: records(modality.supported_parameters),
+    passthroughParameters: records(modality["passthrough_parameters"]),
+    pricing: entries(modality.pricing)
+  };
+}
+function inputSpec(modality) {
+  return {
+    type: modality.type,
+    supportedInputs: isRecord(modality.supported_inputs) ? modality.supported_inputs : {},
+    pricing: entries(modality.pricing)
+  };
+}
 function normalizeModel(document) {
   const textIn = document.input_modalities.find((modality) => modality.type === "text");
   const textOut = document.output_modalities.find((modality) => modality.type === "text");
@@ -94,7 +117,9 @@ function normalizeModel(document) {
     parameters,
     reasoning: reasoningSupport(parameters, document.reasoning),
     isReady: document.is_ready !== false,
-    deprecationDate: document.deprecation_date ?? null
+    deprecationDate: document.deprecation_date ?? null,
+    outputs: document.output_modalities.map(outputSpec),
+    inputs: document.input_modalities.map(inputSpec)
   };
 }
 function isChatModel(model) {
@@ -129,13 +154,13 @@ function isModalityList(value) {
   return Array.isArray(value) && value.every((item) => isRecord2(item) && typeof item["type"] === "string");
 }
 function parseCatalog(payload) {
-  const entries = Array.isArray(payload) ? payload : isRecord2(payload) ? payload["data"] : void 0;
-  if (!Array.isArray(entries)) {
+  const entries2 = Array.isArray(payload) ? payload : isRecord2(payload) ? payload["data"] : void 0;
+  if (!Array.isArray(entries2)) {
     throw new TypeError("catalog payload must be an array or an object with a data array");
   }
   const documents = [];
   const issues = [];
-  entries.forEach((entry, index) => {
+  entries2.forEach((entry, index) => {
     if (!isRecord2(entry)) {
       issues.push({ index, id: null, message: "entry is not an object" });
       return;
@@ -161,23 +186,37 @@ function parseCatalog(payload) {
   return { documents, issues };
 }
 
+// node_modules/@vultr/model-catalog/dist/version.js
+var VERSION = "0.0.4";
+
 // node_modules/@vultr/model-catalog/dist/catalog.js
 var DEFAULT_BASE_URL = "https://api.vultrinference.com/v1";
 var DEFAULT_TIMEOUT_MS = 8e3;
+var runtime = process.versions.bun ? `Bun ${process.versions.bun}` : `Node.js ${process.versions.node}`;
+var USER_AGENT = `vultr-model-catalog/${VERSION} (typescript; ${runtime}; ${process.platform} ${process.arch})`;
 var CatalogError = class extends Error {
   name = "CatalogError";
 };
 function modelsUrl(baseUrl = DEFAULT_BASE_URL) {
   return `${baseUrl.replace(/\/+$/, "")}/models`;
 }
+function mergeHeaders(...layers) {
+  const merged = {};
+  for (const layer of layers) {
+    for (const [name, value] of Object.entries(layer)) {
+      merged[name.toLowerCase()] = value;
+    }
+  }
+  return merged;
+}
 async function fetchCatalog(options = {}) {
-  const url = modelsUrl(options.baseUrl);
+  return getJson(modelsUrl(options.baseUrl), options);
+}
+async function getJson(url, options = {}) {
   const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-  const headers = { accept: "application/json", ...options.headers };
-  if (options.apiKey) {
-    headers["authorization"] = `Bearer ${options.apiKey}`;
-  }
+  const agent = options.userAgent ? `${options.userAgent} ${USER_AGENT}` : USER_AGENT;
+  const headers = mergeHeaders({ accept: "application/json", "user-agent": agent }, options.headers ?? {}, options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {});
   try {
     const response = await (options.fetch ?? globalThis.fetch)(url, { headers, signal });
     if (!response.ok) {
@@ -297,14 +336,19 @@ function toOpenClawModels(models2) {
   return models2.filter(isUsable).map(toOpenClawModel);
 }
 
+// src/version.ts
+var VERSION2 = "0.0.5";
+
 // index.ts
 var PROVIDER = "vultr";
 var API_KEY_ENV = "VULTR_INFERENCE_API_KEY";
 var BASE_URL_ENV = "VULTR_INFERENCE_BASE_URL";
+var USER_AGENT2 = `vultr-model-provider-openclaw/${VERSION2}`;
 var baseUrlFrom = (env) => env[BASE_URL_ENV] || DEFAULT_BASE_URL;
 async function models(baseUrl, agentDir) {
   const catalog = await loadCatalog({
     baseUrl,
+    userAgent: USER_AGENT2,
     timeoutMs: 5e3,
     ...agentDir ? { cachePath: join(agentDir, "cache", "vultr-model-catalog.json") } : {}
   });

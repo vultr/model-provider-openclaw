@@ -5,10 +5,13 @@ import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-aut
 import { DEFAULT_BASE_URL, loadCatalog } from "@vultr/model-catalog";
 
 import { toOpenClawModels, type OpenClawModel } from "./src/models.ts";
+import { VERSION } from "./src/version.ts";
 
 export const PROVIDER = "vultr";
 export const API_KEY_ENV = "VULTR_INFERENCE_API_KEY";
 export const BASE_URL_ENV = "VULTR_INFERENCE_BASE_URL";
+// Goes in front of the catalog library's own User-Agent.
+const USER_AGENT = `vultr-model-provider-openclaw/${VERSION}`;
 
 const baseUrlFrom = (env: NodeJS.ProcessEnv) => env[BASE_URL_ENV] || DEFAULT_BASE_URL;
 
@@ -16,6 +19,7 @@ const baseUrlFrom = (env: NodeJS.ProcessEnv) => env[BASE_URL_ENV] || DEFAULT_BAS
 async function models(baseUrl: string, agentDir: string | undefined): Promise<OpenClawModel[]> {
   const catalog = await loadCatalog({
     baseUrl,
+    userAgent: USER_AGENT,
     timeoutMs: 5_000,
     ...(agentDir ? { cachePath: join(agentDir, "cache", "vultr-model-catalog.json") } : {}),
   });
