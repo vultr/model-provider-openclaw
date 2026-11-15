@@ -26,10 +26,26 @@ Human overview, mapping table and install: `README.md`.
   mandatory.
 - **Siblings:** `model-provider-pi` maps onto almost the same model type (OpenClaw is built on pi). A mapping fix here usually applies there too
 
+## Validation
+
+Fast (inner loop):
+- `node --test test/<name>.test.ts` - one test file. `npm test -- <path>`
+  does not narrow: the script's glob still runs every file.
+  `test/bundle.test.ts` fails until `npm run build`, so leave it out here
+- `node --test --test-name-pattern "<name>" test/<name>.test.ts` - one test
+- `npm run typecheck` - types only
+
+Full (once, before calling a change complete):
+- `npm run build`, then `npm run typecheck` and `npm test` must pass
+
+Heavy (never in the inner loop; run once at the end in the background):
+- the checks against the installed OpenClaw in a throwaway profile, linked
+  and copy installs (below, and the README's key-free capture setup)
+
 ## Working here
 
-- `npm run typecheck` and `npm test` must pass. Types come from the real
-  `openclaw` package (`openclaw/plugin-sdk/*`); do not redeclare them
+- Types come from the real `openclaw` package (`openclaw/plugin-sdk/*`); do
+  not redeclare them
 - `dist/index.js` is committed and must be current: `npm run build` after any
   source change, in the same commit. `test/bundle.test.ts` fails otherwise.
   OpenClaw rejects a TypeScript entry for anything but a linked checkout, and
