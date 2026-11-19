@@ -345,9 +345,10 @@ var API_KEY_ENV = "VULTR_INFERENCE_API_KEY";
 var BASE_URL_ENV = "VULTR_INFERENCE_BASE_URL";
 var USER_AGENT2 = `vultr-model-provider-openclaw/${VERSION2}`;
 var baseUrlFrom = (env) => env[BASE_URL_ENV] || DEFAULT_BASE_URL;
-async function models(baseUrl, agentDir) {
+async function models(baseUrl, agentDir, apiKey) {
   const catalog = await loadCatalog({
     baseUrl,
+    ...apiKey ? { apiKey } : {},
     userAgent: USER_AGENT2,
     timeoutMs: 5e3,
     ...agentDir ? { cachePath: join(agentDir, "cache", "vultr-model-catalog.json") } : {}
@@ -360,6 +361,7 @@ var index_default = definePluginEntry({
   description: "Vultr Inference model provider with a live model catalog",
   register(api) {
     const resolved = /* @__PURE__ */ new Map();
+    let catalogKey;
     api.registerProvider({
       id: PROVIDER,
       label: "Vultr",
@@ -384,10 +386,11 @@ var index_default = definePluginEntry({
           if (!apiKey) {
             return null;
           }
+          catalogKey = apiKey;
           const baseUrl = baseUrlFrom(ctx.env);
           try {
             return {
-              provider: { baseUrl, apiKey, api: "openai-completions", models: await models(baseUrl, ctx.agentDir) }
+              provider: { baseUrl, apiKey, api: "openai-completions", models: await models(baseUrl, ctx.agentDir, apiKey) }
             };
           } catch {
             return null;
@@ -397,7 +400,8 @@ var index_default = definePluginEntry({
       // The agent runtime resolves a model it has no config entry for through these two.
       prepareDynamicModel: async (ctx) => {
         try {
-          for (const model of await models(baseUrlFrom(process.env), ctx.agentDir)) {
+          const key = catalogKey ?? (process.env[API_KEY_ENV] || void 0);
+          for (const model of await models(baseUrlFrom(process.env), ctx.agentDir, key)) {
             resolved.set(model.id, model);
           }
         } catch {

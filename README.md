@@ -43,7 +43,8 @@ TypeScript entry outside a linked checkout, and it installs dependencies with
 
 - `catalog.run` feeds the model list and picker. Following OpenClaw's
   convention it returns `null` without an API key: listing needs no key, but a
-  provider without one cannot be called
+  provider without one cannot be called. The key goes with the catalog read, so
+  the list is the one that key gets
 - `prepareDynamicModel` and `resolveDynamicModel` are what the agent runtime
   uses to resolve `vultr/<id>`. Without them a model that is in the list still
   fails with `Unknown model`. `prepare` loads the catalog; `resolve` is

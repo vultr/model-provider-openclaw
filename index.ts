@@ -15,10 +15,12 @@ const USER_AGENT = `vultr-model-provider-openclaw/${VERSION}`;
 
 const baseUrlFrom = (env: NodeJS.ProcessEnv) => env[BASE_URL_ENV] || DEFAULT_BASE_URL;
 
-// The last good catalog is served when the network fails.
-async function models(baseUrl: string, agentDir: string | undefined): Promise<OpenClawModel[]> {
+// The last good catalog is served when the network fails. The catalog asks for no key; one that is
+// set goes with the read, so the list is the one that key gets.
+async function models(baseUrl: string, agentDir: string | undefined, apiKey: string | undefined): Promise<OpenClawModel[]> {
   const catalog = await loadCatalog({
     baseUrl,
+    ...(apiKey ? { apiKey } : {}),
     userAgent: USER_AGENT,
     timeoutMs: 5_000,
     ...(agentDir ? { cachePath: join(agentDir, "cache", "vultr-model-catalog.json") } : {}),
@@ -33,6 +35,8 @@ export default definePluginEntry({
   register(api) {
     // resolveDynamicModel is synchronous, so prepareDynamicModel fills this first.
     const resolved = new Map<string, OpenClawModel>();
+    // The key the catalog last ran with. prepareDynamicModel is handed none, and must read the same list.
+    let catalogKey: string | undefined;
 
     api.registerProvider({
       id: PROVIDER,
@@ -61,10 +65,11 @@ export default definePluginEntry({
           if (!apiKey) {
             return null;
           }
+          catalogKey = apiKey;
           const baseUrl = baseUrlFrom(ctx.env);
           try {
             return {
-              provider: { baseUrl, apiKey, api: "openai-completions", models: await models(baseUrl, ctx.agentDir) },
+              provider: { baseUrl, apiKey, api: "openai-completions", models: await models(baseUrl, ctx.agentDir, apiKey) },
             };
           } catch {
             return null;
@@ -75,7 +80,8 @@ export default definePluginEntry({
       // The agent runtime resolves a model it has no config entry for through these two.
       prepareDynamicModel: async (ctx) => {
         try {
-          for (const model of await models(baseUrlFrom(process.env), ctx.agentDir)) {
+          const key = catalogKey ?? (process.env[API_KEY_ENV] || undefined);
+          for (const model of await models(baseUrlFrom(process.env), ctx.agentDir, key)) {
             resolved.set(model.id, model);
           }
         } catch {
